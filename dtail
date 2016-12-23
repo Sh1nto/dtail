@@ -1,0 +1,126 @@
+#!/usr/bin/php
+<?php
+/***********************************************
+ *  dtail - Developer Tail
+ *  
+ *  enhancement to tail to auto-add blank lines
+ *  when messages are written to the log.
+ *  Also Highlights PHP-Messages
+ *  
+ *  Written by Tim Meisner 
+ *  Email: dtail [at] midl.de
+ *  
+ *  Free for any use
+ */
+//[Sun Nov 27 08:31:09.138751 2016] [:error] [pid 30039] [client 192.168.xx.xx:50691] script '/var/www/html/genlog.php' not found or unable to stat
+define('LOG_FORMAT', '/^(?<date>\[[^\]]+\]) (?<type>\[[^\]]+\]) (?<pid>\[[^\]]+\]) (?<client>\[[^\]]+\]) (?<msg>.*)$/');
+// Ansi Escape Colors
+define("AEC_OFF"        , "\033[0m");
+define("AEC_BOLD"       , "\033[1m");
+define("AEC_ITALIC"     , "\033[3m");
+define("AEC_UNDERLINE"  , "\033[4m");
+define("AEC_BLINK"      , "\033[5m");
+define("AEC_INVERSE"    , "\033[7m");
+define("AEC_HIDDEN"     , "\033[8m");
+define("AEC_BLACK"      , "\033[30m");
+define("AEC_RED"        , "\033[31m");
+define("AEC_GREEN"      , "\033[32m");
+define("AEC_YELLOW"     , "\033[33m");
+define("AEC_BLUE"       , "\033[34m");
+define("AEC_MAGENTA"    , "\033[35m");
+define("AEC_CYAN"       , "\033[36m");
+define("AEC_WHITE"      , "\033[37m");
+define("AEC_BLACK_BG"   , "\033[40m");
+define("AEC_RED_BG"     , "\033[41m");
+define("AEC_GREEN_BG"   , "\033[42m");
+define("AEC_YELLOW_BG"  , "\033[43m");
+define("AEC_BLUE_BG"    , "\033[44m");
+define("AEC_MAGENTA_BG" , "\033[45m");
+define("AEC_CYAN_BG"    , "\033[46m");
+define("AEC_WHITE_BG"   , "\033[47m");
+
+function print_help() {
+	echo 'dtail v1.0 - Developer Tail'.PHP_EOL;
+	echo 'Usage: dtail <filename>'.PHP_EOL;
+	echo '   or: tail -F /var/log/apache2/error.log | dtail'.PHP_EOL.PHP_EOL;
+	echo 'Parms: '.PHP_EOL;
+	echo '   -p<path>    Path to remove from filenames, otherwise current dir'.PHP_EOL;
+	exit(1);
+}
+
+$filename=false;
+$strippath=getcwd();
+
+for ($i = 1; $i < count($argv); $i++) {
+	if ($argv[$i][0] == '-') {  //Parm?
+		switch ($argv[$i][1]) {
+			case 'p' :
+				$strippath=substr($argv[$i],2);
+				break;
+			default:
+				print_help();
+				exit(1);
+		}
+	} else {
+		$filename=$argv[$i]; //Otherwise filename
+	}
+}
+
+if ($filename) {
+	if (!file_exists($argv[1])) print_help();
+	$handle = popen("tail -F ".$filename." 2>&1", 'r');
+} else {
+	fopen('php://stdin', 'r');
+}
+
+/* Prepare the read array for stream select */
+$read   = array($handle);
+$write  = NULL;
+$except = NULL;
+$datasend=false;
+while (1) {
+	if (false === ($num_changed_streams = stream_select($read, $write, $except, 0, 200000))) {
+		/* Error handling */
+		echo 'Error'.PHP_EOL;
+	} elseif ($num_changed_streams > 0) {
+		$buffer = fgets($handle);
+		if (preg_match(LOG_FORMAT,$buffer,$matches)) {
+
+			// Highlight PHP Warning:
+			$matches['msg']=preg_replace('/PHP (Notice):  (.*) in (.*) on line (\d+)/', 'PHP '.AEC_YELLOW.'\\1'.AEC_OFF.': '.AEC_WHITE.'\\2 in '.AEC_BOLD.'\\3'.AEC_OFF.':'.AEC_GREEN.'\\4'.AEC_OFF, $matches['msg']);
+			
+			// Highlight PHP Notice:
+			$matches['msg']=preg_replace('/PHP (Warning):  (.*) in (.*) on line (\d+)/', 'PHP '.AEC_YELLOW.AEC_BOLD.'\\1'.AEC_OFF.': '.AEC_WHITE.'\\2 in '.AEC_BOLD.'\\3'.AEC_OFF.':'.AEC_GREEN.'\\4'.AEC_OFF, $matches['msg']);
+			
+			// Highlight PHP Fatal error:
+			$matches['msg']=preg_replace('/PHP (Fatal error):  (.*) in (.*) on line (\d+)/', 'PHP '.AEC_RED.'\\1'.AEC_OFF.': '.AEC_WHITE.'\\2 in '.AEC_BOLD.'\\3'.AEC_OFF.':'.AEC_GREEN.'\\4'.AEC_OFF, $matches['msg']);
+			
+			//Higlight function name
+			$matches['msg']=preg_replace('/undefined function (.*) in/', 'undefined function '.AEC_BOLD.'\\1'.AEC_OFF.' in', $matches['msg']);
+
+			// Highlight depth in stack traces and file and line number "PHP   1. {main}() genlog.php:0"
+			$matches['msg'] = preg_replace('/( \d+)\. (.*)\((\d*)\)(.*):(\d+)/', AEC_BLUE.AEC_BOLD.'\\1.'.AEC_OFF.' '.AEC_BOLD.'\\2'.AEC_OFF.'(\\3) \\4:'.AEC_GREEN.'\\5'.AEC_OFF, $matches['msg']);
+
+			// Highlight PHP Stack trace: head
+			$matches['msg'] = preg_replace('/PHP (Stack trace):/', 'PHP '.AEC_BLUE.AEC_BOLD.'\\1'.AEC_OFF.':', $matches['msg']);
+			
+			// Remove path from filenames
+			$matches['msg']=preg_replace('/' . preg_quote($strippath, '/') . '\//', '', $matches['msg']);
+			
+			
+			echo $matches['date'].' '.$matches['msg'].PHP_EOL;
+			$datasend=true;
+		} else echo $buffer;
+	} else {
+		if ($datasend) {
+			echo PHP_EOL.PHP_EOL;
+			$datasend=false;
+		}
+	}
+	
+	//Reset Streams
+	$read   = array($handle);
+	$write  = NULL;
+	$except = NULL;
+}
+?>
