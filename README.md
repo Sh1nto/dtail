@@ -16,10 +16,11 @@ define('LOG_FORMAT', '/^(?<date>\[[^\]]+\]) (?<type>\[[^\]]+\]) (?<pid>\[[^\]]+\
 Customize LOG_FORMAT to your needs
 
 #Usage
-`dtail v1.0 - Developer Tail
-Usage: dtail <filename>
-   or: tail -F /var/log/apache2/error.log | dtail
 
-Parms:
-   -p<path>    Path to remove from filenames, otherwise current dir
-`
+    dtail v1.0 - Developer Tail
+    Usage: dtail <filename>
+       or: tail -F /var/log/apache2/error.log | dtail
+    
+    Parms:
+       -p<path>    Path to remove from filenames, otherwise current dir
+
