@@ -70,7 +70,7 @@ if ($filename) {
 	if (!file_exists($argv[1])) print_help();
 	$handle = popen("tail -F ".$filename." 2>&1", 'r');
 } else {
-	fopen('php://stdin', 'r');
+	$handle = fopen('php://stdin', 'r');
 }
 
 /* Prepare the read array for stream select */
